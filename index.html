@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Simulation Tissu - Viso Studio</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #eee;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* UI Container styles */
+        #ui-container {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            pointer-events: none; /* Let clicks pass through to canvas */
+            z-index: 10;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.4rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            background: linear-gradient(45deg, #4a9eff, #a64aff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p {
+            margin: 5px 0 0 0;
+            font-size: 0.9rem;
+            color: #ccc;
+            max-width: 320px;
+            line-height: 1.5;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+        }
+
+        .controls {
+            margin-top: 20px;
+            pointer-events: auto;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        /* Buttons */
+        button {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(5px);
+            font-weight: 500;
+        }
+
+        button:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: scale(0.96);
+        }
+
+        button.active {
+            background: rgba(74, 158, 255, 0.5);
+            border-color: rgba(74, 158, 255, 0.8);
+            box-shadow: 0 0 10px rgba(74, 158, 255, 0.3);
+            color: #fff;
+        }
+
+        .key {
+            background: rgba(255,255,255,0.15);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        /* Viso Studio Badge */
+        .viso-badge {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #2b2b2b, #1a1a1a);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 10px 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: auto;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .viso-badge::before {
+            content: '';
+            display: block;
+            width: 10px;
+            height: 10px;
+            background: #4a9eff;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #4a9eff;
+        }
+
+        .viso-badge:hover {
+            transform: scale(1.05) translateY(-2px);
+            box-shadow: 0 6px 20px rgba(74, 158, 255, 0.2);
+            border-color: rgba(74, 158, 255, 0.3);
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s;
+            z-index: 100;
+        }
+
+        .modal-overlay.open {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            background: #252525;
+            padding: 30px;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 350px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.05);
+            transform: scale(0.9);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+        }
+
+        .modal-overlay.open .modal-content {
+            transform: scale(1);
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: transparent;
+            border: none;
+            color: #aaa;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+
+        .close-modal:hover {
+            background: rgba(255,255,255,0.1);
+            color: white;
+        }
+
+        .modal-header {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            color: white;
+            font-size: 1.5rem;
+        }
+
+        .modal-links {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .link-item {
+            display: flex;
+            align-items: center;
+            text-decoration: none;
+            color: #eee;
+            background: rgba(255,255,255,0.05);
+            padding: 12px 15px;
+            border-radius: 10px;
+            transition: background 0.2s;
+            font-size: 0.95rem;
+        }
+
+        .link-item:hover {
+            background: rgba(255,255,255,0.1);
+            transform: translateX(5px);
+        }
+
+        .link-icon {
+            margin-right: 12px;
+            width: 24px;
+            text-align: center;
+            font-size: 1.2rem;
+        }
+
+        .studio-name {
+            color: #4a9eff;
+            font-weight: bold;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="ui-container">
+        <h1>Tissu Interactif</h1>
+        <p>
+            <strong>Clic Gauche</strong> pour déplacer.<br>
+            <strong>Clic Droit</strong> (ou <span class="key">Shift</span>) pour couper.<br>
+            Moteur physique Verlet.
+        </p>
+        <div class="controls">
+            <button id="resetBtn">Réinitialiser</button>
+            <button id="toggleModeBtn">Mode: Déplacer</button>
+            <button id="windBtn">Vent: Off</button>
+            <button id="colorBtn">Couleur: Classique</button>
+        </div>
+    </div>
+
+    <!-- Viso Studio Badge -->
+    <div class="viso-badge" id="visoBadge">
+        By Viso Studio
+    </div>
+
+    <!-- Canvas -->
+    <canvas id="canvas"></canvas>
+
+    <!-- Modal Viso Studio -->
+    <div class="modal-overlay" id="visoModal">
+        <div class="modal-content">
+            <button class="close-modal" id="closeModal">&times;</button>
+            <div class="modal-header">
+                <h2>Contact <span class="studio-name">Viso Studio</span></h2>
+                <p style="margin: 5px auto; font-size: 0.85rem; color: #888;">Connectons-nous !</p>
+            </div>
+            <div class="modal-links">
+                <!-- REMPLACEZ LES # PAR VOS VRAIS LIENS ICI -->
+                <a href="https://votresite.com" target="_blank" class="link-item">
+                    <span class="link-icon">🌐</span> Mon Site Web
+                </a>
+                <a href="https://whatsapp.com/channel/votre-chaine" target="_blank" class="link-item">
+                    <span class="link-icon">💬</span> Chaine WhatsApp
+                </a>
+                <a href="tel:+123456789" class="link-item">
+                    <span class="link-icon">📞</span> +123 456 789
+                </a>
+                <a href="mailto:contact@visostudio.com" class="link-item">
+                    <span class="link-icon">✉️</span> contact@visostudio.com
+                </a>
+            </div>
+        </div>
+    </div>
+
+<script>
+/**
+ * Settings & Configuration
+ */
+const settings = {
+    friction: 0.99,
+    gravity: 0.2,
+    accuracy: 3, 
+    spacing: 18,  
+    tearDist: 60, 
+    mouseSize: 20,
+    wind: false,      // Nouvelle fonctionnalité
+    colorMode: false  // Nouvelle fonctionnalité (false = blanc, true = rainbow)
+};
+
+/**
+ * Setup Canvas
+ */
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let width, height;
+
+const resize = () => {
+    width = canvas.width = window.innerWidth;
+    height = canvas.height = window.innerHeight;
+};
+window.addEventListener('resize', resize);
+resize();
+
+/**
+ * Input Handling
+ */
+const mouse = {
+    x: 0, y: 0, px: 0, py: 0,
+    down: false, button: 0, shift: false
+};
+
+let forceCutMode = false;
+
+const updateMouse = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    mouse.px = mouse.x;
+    mouse.py = mouse.y;
+    mouse.x = e.clientX - rect.left;
+    mouse.y = e.clientY - rect.top;
+};
+
+canvas.addEventListener('mousedown', (e) => {
+    mouse.down = true;
+    mouse.button = e.button;
+    mouse.shift = e.shiftKey;
+    updateMouse(e);
+});
+
+canvas.addEventListener('mousemove', (e) => {
+    updateMouse(e);
+    mouse.shift = e.shiftKey;
+});
+
+canvas.addEventListener('mouseup', () => {
+    mouse.down = false;
+    mouse.button = 0;
+    draggedPoint = null;
+});
+
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+canvas.addEventListener('touchstart', (e) => {
+    mouse.down = true;
+    updateMouse(e.touches[0]);
+    if (forceCutMode) mouse.button = 2;
+    else mouse.button = 0;
+}, {passive: false});
+
+canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault(); 
+    updateMouse(e.touches[0]);
+}, {passive: false});
+
+canvas.addEventListener('touchend', () => {
+    mouse.down = false;
+    draggedPoint = null;
+});
+
+/**
+ * Physics Classes
+ */
+
+class Point {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.oldx = x;
+        this.oldy = y;
+        this.pinned = false;
+        // Random offset for wind variation
+        this.noiseOffset = Math.random() * 100; 
+    }
+
+    update(time) {
+        if (this.pinned) return;
+
+        let vx = (this.x - this.oldx) * settings.friction;
+        let vy = (this.y - this.oldy) * settings.friction;
+
+        // Apply Wind if enabled
+        if (settings.wind) {
+            // Simple wind simulation using sine waves
+            const windForce = Math.sin(time / 400 + this.y * 0.05 + this.noiseOffset) * 0.5 + 0.5;
+            vx += windForce * 0.15; // Push right
+        }
+
+        this.oldx = this.x;
+        this.oldy = this.y;
+
+        this.x += vx;
+        this.y += vy;
+        this.y += settings.gravity;
+
+        if (this.y >= height) {
+            this.y = height;
+            this.oldy = this.y + (vy * 0.2); 
+        }
+    }
+}
+
+class Constraint {
+    constructor(p1, p2) {
+        this.p1 = p1;
+        this.p2 = p2;
+        this.length = settings.spacing;
+    }
+
+    resolve() {
+        const dx = this.p1.x - this.p2.x;
+        const dy = this.p1.y - this.p2.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist === 0) return; 
+
+        const diff = (this.length - dist) / dist;
+        const mul = diff * 0.5;
+        const offsetX = dx * mul;
+        const offsetY = dy * mul;
+
+        if (!this.p1.pinned) {
+            this.p1.x += offsetX;
+            this.p1.y += offsetY;
+        }
+        if (!this.p2.pinned) {
+            this.p2.x -= offsetX;
+            this.p2.y -= offsetY;
+        }
+    }
+
+    draw(ctx, index) {
+        // Color logic
+        if (settings.colorMode) {
+            const hue = (index + Date.now() / 10) % 360;
+            ctx.strokeStyle = `hsl(${hue}, 80%, 60%)`;
+            ctx.globalAlpha = 0.8;
+        } else {
+            ctx.strokeStyle = 'rgba(200, 200, 200, 0.8)';
+            ctx.globalAlpha = 1;
+        }
+
+        ctx.beginPath();
+        ctx.moveTo(this.p1.x, this.p1.y);
+        ctx.lineTo(this.p2.x, this.p2.y);
+        ctx.stroke();
+    }
+}
+
+/**
+ * Simulation State
+ */
+let points = [];
+let constraints = [];
+let draggedPoint = null;
+
+function initCloth() {
+    points = [];
+    constraints = [];
+    
+    const startX = width / 2 - (width > 600 ? 250 : width/2.5);
+    const startY = 50;
+    
+    const cols = Math.floor((width > 600 ? 500 : width * 0.8) / settings.spacing);
+    const rows = Math.floor((height > 800 ? 600 : height * 0.7) / settings.spacing);
+
+    for (let y = 0; y <= rows; y++) {
+        for (let x = 0; x <= cols; x++) {
+            const p = new Point(startX + x * settings.spacing, startY + y * settings.spacing);
+            if (y === 0) p.pinned = true;
+            points.push(p);
+        }
+    }
+
+    for (let y = 0; y <= rows; y++) {
+        for (let x = 0; x <= cols; x++) {
+            if (x < cols) {
+                constraints.push(new Constraint(points[y * (cols + 1) + x], points[y * (cols + 1) + x + 1]));
+            }
+            if (y < rows) {
+                constraints.push(new Constraint(points[y * (cols + 1) + x], points[(y + 1) * (cols + 1) + x]));
+            }
+        }
+    }
+}
+
+/**
+ * Update Loop
+ */
+function update() {
+    ctx.clearRect(0, 0, width, height);
+
+    const time = Date.now();
+    handleInput();
+
+    for (let i = 0; i < points.length; i++) {
+        points[i].update(time);
+    }
+
+    for (let i = 0; i < settings.accuracy; i++) {
+        for (let c = 0; c < constraints.length; c++) {
+            constraints[c].resolve();
+        }
+    }
+
+    ctx.lineWidth = 1;
+    // Batch drawing if not in color mode for performance, but singular for rainbow
+    if (!settings.colorMode) {
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(200, 200, 200, 0.8)';
+        for (let c = 0; c < constraints.length; c++) {
+            ctx.moveTo(constraints[c].p1.x, constraints[c].p1.y);
+            ctx.lineTo(constraints[c].p2.x, constraints[c].p2.y);
+        }
+        ctx.stroke();
+    } else {
+        // Draw individually for colors
+        for (let i = 0; i < constraints.length; i++) {
+            constraints[i].draw(ctx, i);
+        }
+    }
+
+    requestAnimationFrame(update);
+}
+
+/**
+ * Helpers
+ */
+function handleInput() {
+    if (!mouse.down) return;
+
+    if (mouse.button === 2 || mouse.shift || forceCutMode) {
+        for (let i = constraints.length - 1; i >= 0; i--) {
+            const c = constraints[i];
+            const midX = (c.p1.x + c.p2.x) / 2;
+            const midY = (c.p1.y + c.p2.y) / 2;
+            const dist = Math.sqrt((midX - mouse.x)**2 + (midY - mouse.y)**2);
+
+            if (dist < settings.mouseSize) {
+                constraints.splice(i, 1);
+            }
+        }
+        return;
+    }
+
+    if (mouse.button === 0) {
+        if (!draggedPoint) {
+            let nearestDist = settings.mouseSize * 2;
+            let nearest = null;
+
+            for (let p of points) {
+                const dx = p.x - mouse.x;
+                const dy = p.y - mouse.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+
+                if (dist < nearestDist) {
+                    nearestDist = dist;
+                    nearest = p;
+                }
+            }
+            draggedPoint = nearest;
+        }
+
+        if (draggedPoint) {
+            draggedPoint.oldx = draggedPoint.x = mouse.x;
+            draggedPoint.oldy = draggedPoint.y = mouse.y;
+        }
+    }
+}
+
+/**
+ * UI Controls
+ */
+document.getElementById('resetBtn').addEventListener('click', initCloth);
+
+const modeBtn = document.getElementById('toggleModeBtn');
+modeBtn.addEventListener('click', () => {
+    forceCutMode = !forceCutMode;
+    if (forceCutMode) {
+        modeBtn.textContent = "Mode: COUPER";
+        modeBtn.classList.add('active');
+        modeBtn.style.background = 'rgba(255, 100, 100, 0.4)';
+        modeBtn.style.borderColor = 'rgba(255, 100, 100, 0.6)';
+    } else {
+        modeBtn.textContent = "Mode: DÉPLACER";
+        modeBtn.classList.remove('active');
+        modeBtn.style.background = '';
+        modeBtn.style.borderColor = '';
+    }
+});
+
+// Wind Button Logic
+const windBtn = document.getElementById('windBtn');
+windBtn.addEventListener('click', () => {
+    settings.wind = !settings.wind;
+    if(settings.wind) {
+        windBtn.textContent = "Vent: ON";
+        windBtn.classList.add('active');
+    } else {
+        windBtn.textContent = "Vent: OFF";
+        windBtn.classList.remove('active');
+    }
+});
+
+// Color Button Logic
+const colorBtn = document.getElementById('colorBtn');
+colorBtn.addEventListener('click', () => {
+    settings.colorMode = !settings.colorMode;
+    if(settings.colorMode) {
+        colorBtn.textContent = "Couleur: RAINBOW";
+        colorBtn.classList.add('active');
+        colorBtn.style.background = 'linear-gradient(45deg, #ff000033, #00ff0033, #0000ff33)';
+    } else {
+        colorBtn.textContent = "Couleur: CLASSIQUE";
+        colorBtn.classList.remove('active');
+        colorBtn.style.background = '';
+    }
+});
+
+
+/**
+ * Viso Studio Modal Logic
+ */
+const modal = document.getElementById('visoModal');
+const badge = document.getElementById('visoBadge');
+const closeBtn = document.getElementById('closeModal');
+
+// Open Modal
+badge.addEventListener('click', () => {
+    modal.classList.add('open');
+});
+
+// Close Modal functions
+const closeModal = () => {
+    modal.classList.remove('open');
+};
+
+closeBtn.addEventListener('click', closeModal);
+
+// Close on outside click
+modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+        closeModal();
+    }
+});
+
+// Close on Escape key
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal.classList.contains('open')) {
+        closeModal();
+    }
+});
+
+// Initialize
+initCloth();
+update();
+
+</script>
+</body>
+</html>
